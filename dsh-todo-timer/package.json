@@ -1,6 +1,6 @@
 {
   "name": "dsh-todo-timer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Live per-task timing for the DSH to-do panel: in-progress items tick (45s / 2m 05s / 1h 03m 05s), completed items freeze their duration, and the header shows the total once the whole list is done. A plugin — no patched install files.",
   "type": "module",
   "main": "lib/index.js",
