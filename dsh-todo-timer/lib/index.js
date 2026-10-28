@@ -28,9 +28,20 @@ const inject = ["sessionProjections"];
 function foldTodoTimer(state, event) {
 	if (event.type !== "todo/write") return state;
 	const now = event.time;
-	const prev = state === null ? /* @__PURE__ */ new Map() : new Map(state.items.map((item) => [item.content, item]));
-	const items = event.data.todos.map((incoming) => {
-		const old = prev.get(incoming.content);
+	const prevItems = state === null ? [] : state.items;
+	const byContent = new Map(prevItems.map((item) => [item.content, item]));
+	const incomingContents = new Set(event.data.todos.map((item) => item.content));
+	const items = event.data.todos.map((incoming, index) => {
+		let old = byContent.get(incoming.content);
+		if (old === void 0) {
+			// Rename inheritance: the model edits item text between writes, which
+			// breaks content matching. A brand-new text at an index whose previous
+			// item vanished from this list inherits that item's timeline, so a
+			// renamed task keeps its real duration instead of freezing at 0s.
+			const positional = prevItems[index];
+			if (positional !== void 0 && !incomingContents.has(positional.content)) old = positional;
+		}
+		const seenAt = old !== void 0 && old.seenAt !== null && old.seenAt !== void 0 ? old.seenAt : now;
 		let startedAt = null;
 		let completedAt = null;
 		if (incoming.status === "in_progress") {
@@ -42,15 +53,16 @@ function foldTodoTimer(state, event) {
 		return {
 			content: incoming.content,
 			status: incoming.status,
+			seenAt,
 			startedAt,
 			completedAt
 		};
 	});
-	const sameList = state !== null && state.items.length === items.length && state.items.every((old, index) => old.content === items[index].content);
-	const createdAt = sameList ? state.createdAt : now;
+	const createdAt = items.length === 0 ? now : items.reduce((min, item) => item.seenAt < min ? item.seenAt : min, items[0].seenAt);
 	const allDone = items.length > 0 && items.every((item) => item.status === "completed");
+	const prevAllDone = state !== null && state.items.length > 0 && state.items.every((item) => item.status === "completed");
 	let completedAt = null;
-	if (allDone) completedAt = sameList && state.completedAt !== null ? state.completedAt : now;
+	if (allDone) completedAt = state !== null && prevAllDone && state.completedAt !== null ? state.completedAt : now;
 	return {
 		items,
 		createdAt,
@@ -75,7 +87,7 @@ function apply(ctx) {
 			viewSchema: passThrough,
 			view: (state) => state
 		},
-		stateVersion: 1
+		stateVersion: 3
 	});
 }
 

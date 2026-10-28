@@ -101,11 +101,12 @@ window.__ModuleLoader__.load({
 		function itemDuration(item, timing, now, listCreatedAt) {
 			if (timing === null || timing === void 0) return null;
 			if (item.status === "in_progress") {
-				if (timing.startedAt === null || timing.startedAt === void 0) return null;
-				return formatDuration(Math.max(0, now - timing.startedAt));
+				const from = timing.startedAt !== null && timing.startedAt !== void 0 ? timing.startedAt : timing.seenAt !== null && timing.seenAt !== void 0 ? timing.seenAt : listCreatedAt;
+				if (from === null || from === void 0) return null;
+				return formatDuration(Math.max(0, now - from));
 			}
 			if (item.status === "completed" && timing.completedAt !== null && timing.completedAt !== void 0) {
-				const from = timing.startedAt !== null && timing.startedAt !== void 0 ? timing.startedAt : listCreatedAt;
+				const from = timing.startedAt !== null && timing.startedAt !== void 0 ? timing.startedAt : timing.seenAt !== null && timing.seenAt !== void 0 ? timing.seenAt : listCreatedAt;
 				if (from === null || from === void 0) return null;
 				return formatDuration(Math.max(0, timing.completedAt - from));
 			}
@@ -117,7 +118,7 @@ window.__ModuleLoader__.load({
 			const lang = STRINGS[uiLang()];
 			const [collapsed, setCollapsed] = react.useState(true);
 			const [now, setNow] = react.useState(() => Date.now());
-			const hasActive = timer !== null && timer !== void 0 && timer.items !== void 0 && timer.items.some((item) => item.status === "in_progress" && item.startedAt !== null);
+			const hasActive = timer !== null && timer !== void 0 && timer.items !== void 0 && timer.items.some((item) => item.status === "in_progress");
 			const expanded = !collapsed && todos.length > 0;
 			react.useLayoutEffect(() => {
 				if (!expanded || !hasActive) return;
