@@ -98,19 +98,20 @@ window.__ModuleLoader__.load({
 		//#endregion
 
 		//#region timing math
-		function itemDuration(item, timing, now, listCreatedAt) {
+		/**
+		* One item's duration text: every item's clock starts when it first entered
+		* the list (`seenAt`), so parallel tasks tick together from the same moment.
+		* Queued and running items tick live; completed items freeze at the value
+		* their clock reached when they finished.
+		*/
+		function itemDuration(item, timing, now) {
 			if (timing === null || timing === void 0) return null;
-			if (item.status === "in_progress") {
-				const from = timing.startedAt !== null && timing.startedAt !== void 0 ? timing.startedAt : timing.seenAt !== null && timing.seenAt !== void 0 ? timing.seenAt : listCreatedAt;
-				if (from === null || from === void 0) return null;
-				return formatDuration(Math.max(0, now - from));
+			if (timing.seenAt === null || timing.seenAt === void 0) return null;
+			if (item.status === "completed") {
+				if (timing.completedAt === null || timing.completedAt === void 0) return null;
+				return formatDuration(Math.max(0, timing.completedAt - timing.seenAt));
 			}
-			if (item.status === "completed" && timing.completedAt !== null && timing.completedAt !== void 0) {
-				const from = timing.startedAt !== null && timing.startedAt !== void 0 ? timing.startedAt : timing.seenAt !== null && timing.seenAt !== void 0 ? timing.seenAt : listCreatedAt;
-				if (from === null || from === void 0) return null;
-				return formatDuration(Math.max(0, timing.completedAt - from));
-			}
-			return null;
+			return formatDuration(Math.max(0, now - timing.seenAt));
 		}
 		//#endregion
 
@@ -118,14 +119,14 @@ window.__ModuleLoader__.load({
 			const lang = STRINGS[uiLang()];
 			const [collapsed, setCollapsed] = react.useState(true);
 			const [now, setNow] = react.useState(() => Date.now());
-			const hasActive = timer !== null && timer !== void 0 && timer.items !== void 0 && timer.items.some((item) => item.status === "in_progress");
+			const hasTicking = timer !== null && timer !== void 0 && timer.items !== void 0 && timer.items.some((item) => item.status !== "completed");
 			const expanded = !collapsed && todos.length > 0;
 			react.useLayoutEffect(() => {
-				if (!expanded || !hasActive) return;
+				if (!expanded || !hasTicking) return;
 				setNow(Date.now());
 				const t = setInterval(() => setNow(Date.now()), 1000);
 				return () => clearInterval(t);
-			}, [expanded, hasActive]);
+			}, [expanded, hasTicking]);
 			if (todos.length === 0) return null;
 			const timingOf = timer === null || timer === void 0 || timer.items === void 0 ? /* @__PURE__ */ new Map() : new Map(timer.items.map((item) => [item.content, item]));
 			const done = todos.filter((item) => item.status === "completed").length;
@@ -159,14 +160,14 @@ window.__ModuleLoader__.load({
 					}), !collapsed && jsx.jsx("ul", {
 						style: S.list,
 						children: todos.map((item) => {
-							const duration = itemDuration(item, timingOf.get(item.content) ?? null, now, timer === null || timer === void 0 ? null : timer.createdAt);
+							const duration = itemDuration(item, timingOf.get(item.content) ?? null, now);
 							return jsx.jsxs("li", {
 								style: S.item,
 								"data-status": item.status,
 								children: [
 									jsx.jsx("span", { style: S.glyph, role: "img", "aria-label": lang.status[item.status] ?? item.status, children: jsx.jsx(StateDot, { state: statusDotState(item.status) }) }),
 									jsx.jsx("span", { style: S.content, children: item.content }),
-									duration === null ? null : jsx.jsx("span", { style: S.time, children: duration })
+									duration === null ? null : jsx.jsx("span", { style: item.status === "pending" ? { ...S.time, opacity: 0.55 } : S.time, children: duration })
 								]
 							}, item.content);
 						})

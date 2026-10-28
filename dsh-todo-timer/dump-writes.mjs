@@ -50,10 +50,9 @@ let state = null;
 for (const e of events) state = foldTodoTimer(state, e);
 console.log('\nfold result (what the panel shows):');
 for (const item of state.items) {
-	const from = item.startedAt ?? item.seenAt ?? state.createdAt;
 	let dur = '—';
-	if (item.status === 'in_progress') dur = fmt(Date.now() - from);
-	else if (item.status === 'completed' && item.completedAt !== null) dur = fmt(item.completedAt - from);
+	if (item.status === 'completed' && item.completedAt !== null) dur = fmt(item.completedAt - item.seenAt);
+	else if (item.status !== 'completed') dur = fmt(Date.now() - item.seenAt);
 	console.log(`  [${item.status.padEnd(11)}] ${dur.padStart(10)}  ${item.content}`);
 }
 if (state.completedAt !== null) console.log('  TOTAL:', fmt(state.completedAt - state.createdAt));
