@@ -35,12 +35,12 @@
       },
       "versions": [
         {
-          "version": "0.1.2",
-          "publishTimestamp": 1793190393,
+          "version": "0.1.3",
+          "publishTimestamp": 1793193158,
           "source": {
             "type": "git",
             "url": "https://github.com/GITHUB_OWNER/dsh-todo-timer",
-            "commit": "eb120cd0f5337abcf8c4b18a737489fd1a441466",
+            "commit": "f9671ea3b2b19c9a95685880f9776d4e6db71754",
             "path": "dsh-todo-timer"
           },
           "engines": { "dsh": ">=0.2.0-rc" }
