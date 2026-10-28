@@ -51,8 +51,15 @@ for (const e of events) state = foldTodoTimer(state, e);
 console.log('\nfold result (what the panel shows):');
 for (const item of state.items) {
 	let dur = '—';
-	if (item.status === 'completed' && item.completedAt !== null) dur = fmt(item.completedAt - item.seenAt);
-	else if (item.status !== 'completed') dur = fmt(Date.now() - item.seenAt);
+	if (item.status === 'in_progress') {
+		const from = item.startedAt ?? item.seenAt;
+		if (from !== null) dur = fmt(Date.now() - from);
+	} else if (item.status === 'completed' && item.startedAt !== null && item.completedAt !== null) {
+		dur = fmt(item.completedAt - item.startedAt);
+	}
 	console.log(`  [${item.status.padEnd(11)}] ${dur.padStart(10)}  ${item.content}`);
 }
-if (state.completedAt !== null) console.log('  TOTAL:', fmt(state.completedAt - state.createdAt));
+if (state.firstStartedAt !== null) {
+	const end = state.completedAt !== null ? state.completedAt : Date.now();
+	console.log('  TOTAL:', fmt(end - state.firstStartedAt), '(from first run start', new Date(state.firstStartedAt).toLocaleTimeString('zh-CN', { hour12: false }) + ')');
+}

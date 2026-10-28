@@ -1,7 +1,8 @@
 /**
  * dsh-todo-timer host half: registers the `todoTimer` session projection that
  * folds `todo/write` event wall-clock times into per-item `startedAt` /
- * `completedAt` stamps, plus list-level `createdAt` / `completedAt`.
+ * `completedAt` stamps, plus list-level `firstStartedAt` (the first task's run
+ * start) and the legacy `createdAt` / `completedAt` bounds.
  *
  * The key is private to this plugin: it never touches the official `todos`
  * projection, so the shipped panel and this one read the same event log
@@ -16,11 +17,18 @@ const inject = ["sessionProjections"];
  * Fold one `todo/write` snapshot into the timing state, inheriting stamps from
  * the previous list by matching `content`: an item keeps `startedAt` while it
  * stays active, gains it when it becomes active, and freezes `completedAt` at
- * the first event that observes it completed. The list-level `completedAt`
- * freezes at the first event where every item is completed; `createdAt`
- * freezes at the first write of the current list (a changed content set
- * restarts it). Timing survives turn boundaries: the stamps replay from the
- * whole event log, so a session reload restores every frozen duration.
+ * the first event that observes it completed.
+ *
+ * `firstStartedAt` is the list-level stopwatch origin: the earliest moment a
+ * task of the current list was observed running. It is inherited while the list
+ * continues (at least one item carried over by exact text) and recomputed when
+ * a brand-new list replaces it, so the panel's total time starts with the first
+ * task run rather than with the list's creation. The legacy list-level
+ * `createdAt` (earliest listing time) and `completedAt` (first all-completed
+ * observation) are kept for older readers and for diagnostics.
+ *
+ * Timing survives turn boundaries: the stamps replay from the whole event log,
+ * so a session reload restores every frozen duration.
  * @param state - previous timing state (null before the first write).
  * @param event - the committed session event (`time` is its wall-clock ms).
  * @returns the next timing state.
@@ -81,6 +89,16 @@ function foldTodoTimer(state, event) {
 			completedAt
 		};
 	});
+	// The list-level stopwatch origin: keep the previous origin while the list
+	// continues, otherwise take the earliest run start this new list has seen.
+	let firstStartedAt = null;
+	if (overlap > 0 && state !== null && state.firstStartedAt !== null && state.firstStartedAt !== void 0) firstStartedAt = state.firstStartedAt;
+	if (firstStartedAt === null) {
+		for (const item of items) {
+			if (item.startedAt === null || item.startedAt === void 0) continue;
+			if (firstStartedAt === null || item.startedAt < firstStartedAt) firstStartedAt = item.startedAt;
+		}
+	}
 	const createdAt = items.length === 0 ? now : items.reduce((min, item) => item.seenAt < min ? item.seenAt : min, items[0].seenAt);
 	const allDone = items.length > 0 && items.every((item) => item.status === "completed");
 	const prevAllDone = state !== null && state.items.length > 0 && state.items.every((item) => item.status === "completed");
@@ -90,6 +108,7 @@ function foldTodoTimer(state, event) {
 		items,
 		createdAt,
 		completedAt,
+		firstStartedAt,
 		lastWriteInTurn: now
 	};
 }
@@ -111,7 +130,7 @@ function apply(ctx) {
 			viewSchema: passThrough,
 			view: (state) => state
 		},
-		stateVersion: 6
+		stateVersion: 7
 	});
 }
 

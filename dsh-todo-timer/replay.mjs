@@ -43,11 +43,17 @@ else {
 	};
 	const now = Date.now();
 	for (const item of state.items) {
-		const from = item.startedAt ?? item.seenAt ?? state.createdAt;
 		let dur = '—';
-		if (item.status === 'in_progress') dur = fmt(now - from);
-		else if (item.status === 'completed' && item.completedAt !== null) dur = fmt(item.completedAt - from);
+		if (item.status === 'in_progress') {
+			const from = item.startedAt ?? item.seenAt;
+			if (from !== null) dur = fmt(now - from);
+		} else if (item.status === 'completed' && item.startedAt !== null && item.completedAt !== null) {
+			dur = fmt(item.completedAt - item.startedAt);
+		}
 		console.log(`[${item.status.padEnd(11)}] ${dur.padStart(10)}  ${item.content}`);
 	}
-	if (state.completedAt !== null) console.log('TOTAL:', fmt(state.completedAt - state.createdAt));
+	if (state.firstStartedAt !== null) {
+		const end = state.completedAt !== null ? state.completedAt : now;
+		console.log('TOTAL:', fmt(end - state.firstStartedAt));
+	}
 }

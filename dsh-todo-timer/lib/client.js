@@ -61,12 +61,13 @@ window.__ModuleLoader__.load({
 			lead: { color: "var(--dsw-alias-label-tertiary)", flex: "none", placeItems: "center", display: "grid" },
 			title: { color: "var(--dsw-alias-label-primary)", flex: "none", fontSize: 13, fontWeight: 500, lineHeight: "24px" },
 			progress: { minWidth: 0, color: "var(--dsw-alias-label-tertiary)", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: "auto", fontSize: 13, fontWeight: 400, lineHeight: "20px", overflow: "hidden" },
+			total: { flex: "none", color: "var(--dsw-alias-label-secondary)", fontSize: 12, fontWeight: 500, lineHeight: "20px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" },
 			chevron: { color: "var(--dsw-alias-label-tertiary)", flex: "none", placeItems: "center", display: "grid" },
 			list: { flexDirection: "column", gap: 8, maxHeight: 180, margin: 0, padding: 0, listStyle: "none", display: "flex", overflowY: "auto" },
 			item: { minWidth: 0, color: "var(--dsw-alias-label-secondary)", alignItems: "center", gap: 10, fontSize: 13, lineHeight: "20px", display: "flex" },
 			glyph: { flex: "none", placeItems: "center", width: 16, height: 16, display: "grid" },
 			content: { textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden" },
-			time: { marginLeft: "auto", flex: "none", color: "var(--dsw-alias-label-tertiary)", fontSize: 12, fontWeight: 400, lineHeight: "20px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }
+			time: { marginLeft: "auto", flex: "none", color: "var(--dsw-alias-label-tertiary)", fontSize: 12, fontWeight: 400, lineHeight: "20px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", textAlign: "right" }
 		};
 		//#endregion
 
@@ -98,20 +99,58 @@ window.__ModuleLoader__.load({
 		//#endregion
 
 		//#region timing math
+		/** Stable empty list so a missing projection never allocates a fresh array per render. */
+		const NO_ITEMS = [];
+
 		/**
-		* One item's duration text: every item's clock starts when it first entered
-		* the list (`seenAt`), so parallel tasks tick together from the same moment.
-		* Queued and running items tick live; completed items freeze at the value
-		* their clock reached when they finished.
+		* One item's duration text. Only a task that actually ran has a clock:
+		* an `in_progress` item ticks from the moment it entered that state
+		* (`startedAt`), so several items running in parallel tick together on the
+		* same wall clock; a completed item freezes at the time it spent running
+		* (`startedAt` → `completedAt`). A pending (queued) item has no clock, and
+		* a completed item that was never observed running has no measured run
+		* time either — it shows nothing rather than billing its queue time.
 		*/
 		function itemDuration(item, timing, now) {
 			if (timing === null || timing === void 0) return null;
-			if (timing.seenAt === null || timing.seenAt === void 0) return null;
+			if (item.status === "in_progress") {
+				const from = timing.startedAt !== null && timing.startedAt !== void 0 ? timing.startedAt : timing.seenAt;
+				if (from === null || from === void 0) return null;
+				return formatDuration(Math.max(0, now - from));
+			}
 			if (item.status === "completed") {
 				if (timing.completedAt === null || timing.completedAt === void 0) return null;
-				return formatDuration(Math.max(0, timing.completedAt - timing.seenAt));
+				if (timing.startedAt === null || timing.startedAt === void 0) return null;
+				return formatDuration(Math.max(0, timing.completedAt - timing.startedAt));
 			}
-			return formatDuration(Math.max(0, now - timing.seenAt));
+			return null;
+		}
+
+		/**
+		* The list-level stopwatch: it starts when the first task entered the
+		* running state — `firstStartedAt` from the host projection when present,
+		* otherwise the earliest per-item `startedAt` (older host halves) — and
+		* freezes at the last completion once every task is done. `null` while no
+		* task has ever run (an all-pending queue has no total to show).
+		*/
+		function totalSpan(timer, items, allDone, now) {
+			if (timer === null || timer === void 0) return null;
+			let start = null;
+			if (typeof timer.firstStartedAt === "number" && Number.isFinite(timer.firstStartedAt)) start = timer.firstStartedAt;
+			if (start === null) {
+				for (const item of items) {
+					if (item.startedAt === null || item.startedAt === void 0) continue;
+					if (start === null || item.startedAt < start) start = item.startedAt;
+				}
+			}
+			if (start === null) return null;
+			if (!allDone) return { start, end: now };
+			let end = null;
+			for (const item of items) {
+				if (item.status !== "completed" || item.completedAt === null || item.completedAt === void 0) continue;
+				if (end === null || item.completedAt > end) end = item.completedAt;
+			}
+			return { start, end: end === null ? now : end };
 		}
 		//#endregion
 
@@ -119,27 +158,30 @@ window.__ModuleLoader__.load({
 			const lang = STRINGS[uiLang()];
 			const [collapsed, setCollapsed] = react.useState(true);
 			const [now, setNow] = react.useState(() => Date.now());
-			const hasTicking = timer !== null && timer !== void 0 && timer.items !== void 0 && timer.items.some((item) => item.status !== "completed");
-			const expanded = !collapsed && todos.length > 0;
-			react.useLayoutEffect(() => {
-				if (!expanded || !hasTicking) return;
-				setNow(Date.now());
-				const t = setInterval(() => setNow(Date.now()), 1000);
-				return () => clearInterval(t);
-			}, [expanded, hasTicking]);
-			if (todos.length === 0) return null;
-			const timingOf = timer === null || timer === void 0 || timer.items === void 0 ? /* @__PURE__ */ new Map() : new Map(timer.items.map((item) => [item.content, item]));
+			const items = timer !== null && timer !== void 0 && timer.items !== void 0 ? timer.items : NO_ITEMS;
+			// One pass per projection update instead of one Map per one-second tick.
+			const timingOf = react.useMemo(() => new Map(items.map((item) => [item.content, item])), [items]);
 			const done = todos.filter((item) => item.status === "completed").length;
 			const active = todos.filter((item) => item.status === "in_progress").length;
 			const pending = todos.length - done - active;
-			let header = [
+			const allDone = todos.length > 0 && done === todos.length;
+			const span = totalSpan(timer, items, allDone, now);
+			// The header total is visible while collapsed, so it must keep ticking
+			// even then; item clocks only exist while something is running.
+			const ticking = todos.length > 0 && span !== null && !allDone;
+			react.useEffect(() => {
+				if (!ticking) return;
+				setNow(Date.now());
+				const t = setInterval(() => setNow(Date.now()), 1000);
+				return () => clearInterval(t);
+			}, [ticking]);
+			if (todos.length === 0) return null;
+			const header = [
 				...done > 0 ? [lang.done(done)] : [],
 				...active > 0 ? [lang.active(active)] : [],
 				...pending > 0 ? [lang.pending(pending)] : []
 			].join(" · ");
-			if (timer !== null && timer !== void 0 && timer.completedAt !== null && timer.completedAt !== void 0 && timer.createdAt !== null && timer.createdAt !== void 0) {
-				header = `${header} · ${lang.total(formatDuration(Math.max(0, timer.completedAt - timer.createdAt)))}`;
-			}
+			const total = span === null ? null : lang.total(formatDuration(Math.max(0, span.end - span.start)));
 			return jsx.jsx("section", {
 				style: S.root,
 				"data-testid": "todo-panel",
@@ -155,6 +197,7 @@ window.__ModuleLoader__.load({
 							jsx.jsx("span", { style: S.lead, "aria-hidden": true, children: jsx.jsx(ChecklistIcon, {}) }),
 							jsx.jsx("span", { style: S.title, children: lang.title }),
 							jsx.jsx("span", { style: S.progress, children: header }),
+							total === null ? null : jsx.jsx("span", { style: S.total, "data-testid": "todo-timer-total", children: total }),
 							jsx.jsx("span", { style: S.chevron, "aria-hidden": true, children: jsx.jsx(Chevron, { up: collapsed }) })
 						]
 					}), !collapsed && jsx.jsx("ul", {
@@ -167,7 +210,7 @@ window.__ModuleLoader__.load({
 								children: [
 									jsx.jsx("span", { style: S.glyph, role: "img", "aria-label": lang.status[item.status] ?? item.status, children: jsx.jsx(StateDot, { state: statusDotState(item.status) }) }),
 									jsx.jsx("span", { style: S.content, children: item.content }),
-									duration === null ? null : jsx.jsx("span", { style: item.status === "pending" ? { ...S.time, opacity: 0.55 } : S.time, children: duration })
+									duration === null ? null : jsx.jsx("span", { style: S.time, "data-testid": "todo-timer-item-time", children: duration })
 								]
 							}, item.content);
 						})
@@ -204,7 +247,9 @@ window.__ModuleLoader__.load({
 		exports.apply = apply;
 		exports.formatDuration = formatDuration;
 		exports.inject = inject;
+		exports.itemDuration = itemDuration;
 		exports.name = name;
+		exports.totalSpan = totalSpan;
 		return module.exports;
 	}
 });
