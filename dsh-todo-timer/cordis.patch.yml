@@ -1,0 +1,10 @@
+# dsh-todo-timer bundle patch
+#
+# One host row: its `apply` registers the `todoTimer` session projection
+# (foldTodoTimings over `todo/write` events). The browser half is discovered
+# from this package's `dsh.client` manifest by the modules node half — the
+# client panel shadows the shipped todo dock entry (same slot, same id,
+# registered later) and needs no row of its own.
+- insert:
+    - id: todo-timer
+      name: 'dsh-todo-timer'

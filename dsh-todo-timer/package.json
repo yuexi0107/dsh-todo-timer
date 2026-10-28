@@ -1,0 +1,46 @@
+{
+  "name": "dsh-todo-timer",
+  "version": "0.1.0",
+  "description": "Live per-task timing for the DSH to-do panel: in-progress items tick (45s / 2m 05s / 1h 03m 05s), completed items freeze their duration, and the header shows the total once the whole list is done. A plugin — no patched install files.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md"
+  ],
+  "icon": "./icon.svg",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/dsh-todo-timer.git"
+  },
+  "keywords": ["dsh", "dsh-plugin", "todo", "timer", "session-projection"],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    },
+    "manifestVersion": 1
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4"
+  }
+}
