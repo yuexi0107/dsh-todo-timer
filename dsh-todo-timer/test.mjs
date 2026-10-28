@@ -44,13 +44,14 @@ s = foldTodoTimer(s, ev([
 ], T3 + 5000));
 assert.equal(s.completedAt, T3, 'frozen');
 
-// turn/start keeps every stamp but tightens the lower bound to the turn time.
+// turn/start keeps every stamp but re-arms the per-turn clocks.
 const before = s;
 s = foldTodoTimer(s, { type: 'turn/start', time: T3 + 9000, data: {} });
 assert.deepEqual(s.items, before.items, 'turn/start preserves item timelines');
 assert.equal(s.createdAt, before.createdAt);
 assert.equal(s.completedAt, T3, 'frozen total survives the boundary');
-assert.equal(s.lastWriteAt, T3 + 9000, 'lower bound moves to the turn');
+assert.equal(s.turnStartedAt, T3 + 9000, 'turn clock armed');
+assert.equal(s.lastWriteInTurn, null, 'write clock re-armed');
 
 // Batch completion of never-observed-active items: seenAt gives a real duration, not 0s.
 const B1 = T3 + 20_000;
@@ -78,7 +79,7 @@ s = foldTodoTimer(s, ev([
 ], C1));
 assert.equal(s.createdAt, B1, 'createdAt survives list growth');
 assert.equal(s.completedAt, null, 'reopened list clears the frozen total');
-assert.equal(s.items[2].seenAt, B2, 'appended item starts at the previous write');
+assert.equal(s.items[2].seenAt, C1, 'appended open item starts at this write');
 
 // Reopen: completed -> in_progress restarts the item clock but keeps seenAt.
 s = foldTodoTimer(s, ev([
@@ -93,7 +94,7 @@ s = foldTodoTimer(s, ev([
 	{ content: 'Z', status: 'in_progress' }
 ], C1 + 50_000));
 assert.equal(s.items[2].startedAt, C1 + 50_000, 'reopened restarts');
-assert.equal(s.items[2].seenAt, B2, 'seenAt survives reopen');
+assert.equal(s.items[2].seenAt, C1, 'seenAt survives reopen');
 
 // Unrelated events pass the state through unchanged.
 assert.equal(foldTodoTimer(s, { type: 'user/message', time: 1, data: {} }), s);
@@ -126,6 +127,19 @@ r = foldTodoTimer(r, ev([
 ], N1));
 assert.equal(r.items[2].seenAt, R2, 'brand-new item starts at the previous write');
 assert.equal(r.items[2].startedAt, null);
+
+// First write of a new turn: an item reported completed without ever being
+// open takes the turn's beginning as its lower bound; a vanished completed
+// item is NOT grafted onto the fresh text at its index.
+const TS1 = N1 + 60_000;
+r = foldTodoTimer(r, { type: 'turn/start', time: TS1, data: {} });
+const TW1 = TS1 + 20_000;
+r = foldTodoTimer(r, ev([
+	{ content: 'new name', status: 'completed' },
+	{ content: 'quick one', status: 'completed' }
+], TW1));
+assert.equal(r.items[1].seenAt, TS1, 'turn-first completed item starts at the turn beginning');
+assert.equal(r.items[1].completedAt, TW1);
 
 const client = fs.readFileSync('./lib/client.js', 'utf8');
 new vm.Script(client, { filename: 'client.js' });

@@ -27,12 +27,14 @@ const inject = ["sessionProjections"];
  */
 function foldTodoTimer(state, event) {
 	if (event.type === "turn/start") {
-		// A turn boundary tightens the honest lower bound for items that appear
-		// mid-turn already completed: their work began no earlier than this turn.
+		// A turn boundary re-arms the per-turn clocks: the turn's opening write
+		// created its items after the turn began, and anything first reported
+		// completed in this turn's writes took at least since the turn began.
 		if (state === null) return state;
 		return {
 			...state,
-			lastWriteAt: event.time
+			turnStartedAt: event.time,
+			lastWriteInTurn: null
 		};
 	}
 	if (event.type !== "todo/write") return state;
@@ -48,18 +50,21 @@ function foldTodoTimer(state, event) {
 		let old = byContent.get(incoming.content);
 		if (old === void 0 && overlap > 0) {
 			// Rename inheritance: the model edits item text between writes, which
-			// breaks content matching. Only a still-running (in_progress) item that
-			// vanished from the new list may pass its timeline to the fresh text at
-			// its index — a completed item is a closed book, and grafting its
-			// duration onto an unrelated new task would fabricate time.
+			// breaks content matching. A vanished non-completed item (still running
+			// or still queued) may pass its timeline to the fresh text at its index
+			// — its work is open, so the listing time stays honest. A completed
+			// item is a closed book: grafting its duration onto an unrelated new
+			// task would fabricate time.
 			const positional = prevItems[index];
-			if (positional !== void 0 && positional.status === "in_progress" && !incomingContents.has(positional.content)) old = positional;
+			if (positional !== void 0 && positional.status !== "completed" && !incomingContents.has(positional.content)) old = positional;
 		}
-		// A brand-new item with no inherited timeline started somewhere after the
-		// last list write or the current turn began (whichever is later): that
-		// boundary is the honest lower bound, never a fabricated old duration and
-		// never a misleading zero for work that visibly took time.
-		const seenAt = old !== void 0 && old.seenAt !== null && old.seenAt !== void 0 ? old.seenAt : state !== null && state.lastWriteAt !== null && state.lastWriteAt !== void 0 ? state.lastWriteAt : now;
+		// A brand-new item with no inherited timeline: one first listed as open
+		// (pending/in_progress) starts at this write; one first reported already
+		// completed did its work since this turn's previous list write, or since
+		// the turn began when this is the turn's first write. Those boundaries
+		// are honest lower bounds — never a fabricated old duration, never a
+		// misleading zero for work that visibly took time.
+		const seenAt = old !== void 0 && old.seenAt !== null && old.seenAt !== void 0 ? old.seenAt : incoming.status === "completed" && state !== null ? state.lastWriteInTurn !== null && state.lastWriteInTurn !== void 0 ? state.lastWriteInTurn : state.turnStartedAt !== null && state.turnStartedAt !== void 0 ? state.turnStartedAt : now : now;
 		let startedAt = null;
 		let completedAt = null;
 		if (incoming.status === "in_progress") {
@@ -85,7 +90,7 @@ function foldTodoTimer(state, event) {
 		items,
 		createdAt,
 		completedAt,
-		lastWriteAt: now
+		lastWriteInTurn: now
 	};
 }
 
@@ -106,7 +111,7 @@ function apply(ctx) {
 			viewSchema: passThrough,
 			view: (state) => state
 		},
-		stateVersion: 4
+		stateVersion: 6
 	});
 }
 
