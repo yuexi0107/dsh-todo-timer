@@ -3,7 +3,7 @@
   "title": { "en": "dsh-todo-timer", "zh": "任务计时" },
   "description": {
     "en": "Community index for dsh-todo-timer: live per-task timing for the DSH to-do panel.",
-    "zh": "dsh-todo-timer 社区索引：给 DSH 任务面板加上每项计时与总耗时。"
+    "zh": "dsh-todo-timer 社区索引：给 DSH 任务面板加上每项计时与顶部总耗时。"
   },
   "metadata": {
     "categories": {
@@ -19,8 +19,8 @@
       "name": "dsh-todo-timer",
       "title": { "en": "To-do Timer", "zh": "任务计时" },
       "description": {
-        "en": "Live per-task timing for the to-do panel: in-progress items tick (45s / 2m 05s / 1h 03m 05s), completed items freeze their duration, and the header shows the total once the whole list is done. A pure plugin — no patched install files.",
-        "zh": "给任务面板加每项计时：进行中实时跳动（45s / 2m 05s / 1h 03m 05s），已完成定格耗时，全部完成时标题显示总耗时。纯插件，不修改任何安装文件。"
+        "en": "Live per-task timing for the to-do panel: only in-progress tasks tick (parallel runners tick together), queued tasks show no clock, completed tasks freeze their measured run time, and the header shows the running total from the first task's start. A pure plugin — no patched install files.",
+        "zh": "给任务面板加每项计时与顶部总耗时：只有运行中的任务实时跳动（并行任务一起跳），排队任务不计时，已完成定格实际运行时长；顶部总耗时从第一个任务开始运行起计时。纯插件，不修改任何安装文件。"
       },
       "author": "yujun.cheng",
       "homepage": "https://github.com/GITHUB_OWNER/dsh-todo-timer",
@@ -34,6 +34,17 @@
         "labels": ["todo", "timing"]
       },
       "versions": [
+        {
+          "version": "0.2.0",
+          "publishTimestamp": 1793201525,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/GITHUB_OWNER/dsh-todo-timer",
+            "commit": "07df5e3aaeb2f69e3fff78977f1f9f0b9e06873e",
+            "path": "dsh-todo-timer"
+          },
+          "engines": { "dsh": ">=0.2.0-rc" }
+        },
         {
           "version": "0.1.3",
           "publishTimestamp": 1793193158,
