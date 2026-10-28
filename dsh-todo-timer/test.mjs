@@ -44,10 +44,13 @@ s = foldTodoTimer(s, ev([
 ], T3 + 5000));
 assert.equal(s.completedAt, T3, 'frozen');
 
-// turn/start does NOT reset (cross-turn replay keeps durations).
+// turn/start keeps every stamp but tightens the lower bound to the turn time.
 const before = s;
 s = foldTodoTimer(s, { type: 'turn/start', time: T3 + 9000, data: {} });
-assert.equal(s, before, 'turn/start is a no-op');
+assert.deepEqual(s.items, before.items, 'turn/start preserves item timelines');
+assert.equal(s.createdAt, before.createdAt);
+assert.equal(s.completedAt, T3, 'frozen total survives the boundary');
+assert.equal(s.lastWriteAt, T3 + 9000, 'lower bound moves to the turn');
 
 // Batch completion of never-observed-active items: seenAt gives a real duration, not 0s.
 const B1 = T3 + 20_000;
@@ -75,7 +78,7 @@ s = foldTodoTimer(s, ev([
 ], C1));
 assert.equal(s.createdAt, B1, 'createdAt survives list growth');
 assert.equal(s.completedAt, null, 'reopened list clears the frozen total');
-assert.equal(s.items[2].seenAt, C1);
+assert.equal(s.items[2].seenAt, B2, 'appended item starts at the previous write');
 
 // Reopen: completed -> in_progress restarts the item clock but keeps seenAt.
 s = foldTodoTimer(s, ev([
@@ -90,7 +93,7 @@ s = foldTodoTimer(s, ev([
 	{ content: 'Z', status: 'in_progress' }
 ], C1 + 50_000));
 assert.equal(s.items[2].startedAt, C1 + 50_000, 'reopened restarts');
-assert.equal(s.items[2].seenAt, C1, 'seenAt survives reopen');
+assert.equal(s.items[2].seenAt, B2, 'seenAt survives reopen');
 
 // Unrelated events pass the state through unchanged.
 assert.equal(foldTodoTimer(s, { type: 'user/message', time: 1, data: {} }), s);
@@ -114,14 +117,14 @@ assert.equal(r.items[0].startedAt, R1, 'renamed item inherits startedAt');
 assert.equal(r.items[0].completedAt, R2, 'rename does not fabricate completion');
 
 // A genuinely new item at an index whose old item is still in the list does
-// NOT inherit anything (no phantom timeline).
+// NOT inherit anything; its lower bound is the previous write's time.
 const N1 = R2 + 10_000;
 r = foldTodoTimer(r, ev([
 	{ content: 'new name', status: 'completed' },
 	{ content: 'other', status: 'completed' },
 	{ content: 'brand new', status: 'completed' }
 ], N1));
-assert.equal(r.items[2].seenAt, N1, 'brand-new item starts now');
+assert.equal(r.items[2].seenAt, R2, 'brand-new item starts at the previous write');
 assert.equal(r.items[2].startedAt, null);
 
 const client = fs.readFileSync('./lib/client.js', 'utf8');

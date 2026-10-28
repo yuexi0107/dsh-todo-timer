@@ -26,22 +26,40 @@ const inject = ["sessionProjections"];
  * @returns the next timing state.
  */
 function foldTodoTimer(state, event) {
+	if (event.type === "turn/start") {
+		// A turn boundary tightens the honest lower bound for items that appear
+		// mid-turn already completed: their work began no earlier than this turn.
+		if (state === null) return state;
+		return {
+			...state,
+			lastWriteAt: event.time
+		};
+	}
 	if (event.type !== "todo/write") return state;
 	const now = event.time;
 	const prevItems = state === null ? [] : state.items;
 	const byContent = new Map(prevItems.map((item) => [item.content, item]));
 	const incomingContents = new Set(event.data.todos.map((item) => item.content));
+	// Continuation detection: at least one item carried over by exact text.
+	// A zero-overlap write is a brand-new list, where positional matching
+	// would graft unrelated old timelines onto fresh items.
+	const overlap = event.data.todos.reduce((count, item) => count + (byContent.has(item.content) ? 1 : 0), 0);
 	const items = event.data.todos.map((incoming, index) => {
 		let old = byContent.get(incoming.content);
-		if (old === void 0) {
+		if (old === void 0 && overlap > 0) {
 			// Rename inheritance: the model edits item text between writes, which
-			// breaks content matching. A brand-new text at an index whose previous
-			// item vanished from this list inherits that item's timeline, so a
-			// renamed task keeps its real duration instead of freezing at 0s.
+			// breaks content matching. Only a still-running (in_progress) item that
+			// vanished from the new list may pass its timeline to the fresh text at
+			// its index — a completed item is a closed book, and grafting its
+			// duration onto an unrelated new task would fabricate time.
 			const positional = prevItems[index];
-			if (positional !== void 0 && !incomingContents.has(positional.content)) old = positional;
+			if (positional !== void 0 && positional.status === "in_progress" && !incomingContents.has(positional.content)) old = positional;
 		}
-		const seenAt = old !== void 0 && old.seenAt !== null && old.seenAt !== void 0 ? old.seenAt : now;
+		// A brand-new item with no inherited timeline started somewhere after the
+		// last list write or the current turn began (whichever is later): that
+		// boundary is the honest lower bound, never a fabricated old duration and
+		// never a misleading zero for work that visibly took time.
+		const seenAt = old !== void 0 && old.seenAt !== null && old.seenAt !== void 0 ? old.seenAt : state !== null && state.lastWriteAt !== null && state.lastWriteAt !== void 0 ? state.lastWriteAt : now;
 		let startedAt = null;
 		let completedAt = null;
 		if (incoming.status === "in_progress") {
@@ -66,7 +84,8 @@ function foldTodoTimer(state, event) {
 	return {
 		items,
 		createdAt,
-		completedAt
+		completedAt,
+		lastWriteAt: now
 	};
 }
 
@@ -87,7 +106,7 @@ function apply(ctx) {
 			viewSchema: passThrough,
 			view: (state) => state
 		},
-		stateVersion: 3
+		stateVersion: 4
 	});
 }
 
