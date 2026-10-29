@@ -40,7 +40,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/yuexi0107/dsh-todo-timer",
-            "commit": "0000000000000000000000000000000000000000",
+            "commit": "6a0c941b20740ee5a1034e539648782ea217e435",
             "path": "dsh-todo-timer"
           },
           "engines": { "dsh": ">=0.2.0-rc" }
