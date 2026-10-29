@@ -1,0 +1,7 @@
+url: https://github.com/yuexi0107/dsh-todo-timer
+name: yuexi0107/dsh-todo-timer
+category: ui
+description:
+  en: Live per-task timing for the DSH to-do panel with status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a total from the first task start until the current list ends.
+  zh: 给 DSH 任务面板加上状态计数、序号、每项耗时与总耗时；完成项耗时冻结，从未实际运行的完成项显示 0s，总耗时从当前清单第一个任务开始到全部结束。
+icon: https://raw.githubusercontent.com/yuexi0107/dsh-todo-timer/main/assets/icon-180.png
