@@ -39,11 +39,11 @@
 方式一 · 插件页直接装（无需市场）：侧边栏 **插件 → 安装**，填
 
 ```
-git+https://github.com/GITHUB_OWNER/dsh-todo-timer.git#<commit-sha>
+git+https://github.com/yuexi0107/dsh-todo-timer.git#<commit-sha>
 ```
 
 方式二 · 市场索引：在 **发现** 页添加索引 URL（本仓库任意静态托管地址，如
-`https://raw.githubusercontent.com/GITHUB_OWNER/dsh-todo-timer/main/market-index.json`），
+`https://raw.githubusercontent.com/yuexi0107/dsh-todo-timer/main/market-index.json`），
 搜索 `dsh-todo-timer` 安装。
 
 安装后重启应用生效。插件页可随时停用/删除；停用即恢复官方任务面板。

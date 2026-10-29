@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GITHUB_OWNER/dsh-todo-timer.git"
+    "url": "git+https://github.com/yuexi0107/dsh-todo-timer.git"
   },
   "keywords": ["dsh", "dsh-plugin", "todo", "timer", "duration", "status-count", "session-projection"],
   "dsh": {
