@@ -1,7 +1,7 @@
 {
   "name": "dsh-todo-timer",
-  "version": "0.2.0",
-  "description": "Live per-task timing for the DSH to-do panel: only in-progress items tick (parallel running tasks tick together), queued items show no clock, completed items freeze their measured run time, and the header shows the running total from the first task's start. A plugin — no patched install files.",
+  "version": "0.3.0",
+  "description": "Live per-task timing for the DSH to-do panel: always-on status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a total from the first task start until the current list ends. A pure plugin — no patched install files.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -25,9 +25,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/dsh-todo-timer.git"
+    "url": "git+https://github.com/GITHUB_OWNER/dsh-todo-timer.git"
   },
-  "keywords": ["dsh", "dsh-plugin", "todo", "timer", "session-projection"],
+  "keywords": ["dsh", "dsh-plugin", "todo", "timer", "duration", "status-count", "session-projection"],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

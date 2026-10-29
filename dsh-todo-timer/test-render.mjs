@@ -105,8 +105,12 @@ function itemsOf(tree) {
 		const timeNode = byTestId(li, 'todo-timer-item-time');
 		const time = timeNode === null ? null : textOf(timeNode);
 		const full = textOf(li);
-		const content = time === null ? full : full.slice(0, full.length - time.length);
-		return { status: li.props['data-status'], content, time };
+		const withoutTime = time === null ? full : full.slice(0, full.length - time.length);
+		// Rows now start with an ordinal ("1.", "2.", ...): expose it separately
+		// and strip it from the task content used by the behavior assertions.
+		const ordinal = /^(\d+)\./.exec(withoutTime)?.[1] ?? null;
+		const content = withoutTime.replace(/^\d+\.\s*/, '');
+		return { status: li.props['data-status'], content, time, ordinal, full };
 	});
 }
 
@@ -291,7 +295,7 @@ console.log('ok  collapsed header total ticks');
 }
 console.log('ok  completed freezes + total freezes');
 
-//#region never-ran completed items show no clock ------------------------------
+//#region never-ran completed items show 0s -------------------------------------
 {
 	intervals.length = 0;
 	const todos = [
@@ -305,11 +309,11 @@ console.log('ok  completed freezes + total freezes');
 	const panel = mount(todos, timer, T + 90_000);
 	panel.toggle();
 	assert.equal(panel.items[0].time, '1m 00s');
-	assert.equal(panel.items[1].time, null, 'queued -> completed without ever running has no run time');
+	assert.equal(panel.items[1].time, '0s', 'queued -> completed without ever running shows 0s');
 	assert.equal(panel.total, '总耗时 1m 30s', 'total still ends at the last completion');
 	panel.unmount();
 }
-console.log('ok  never-ran completed item shows no clock');
+console.log('ok  never-ran completed item shows 0s');
 
 //#region old host fallback (no firstStartedAt) --------------------------------
 {
@@ -387,11 +391,108 @@ assert.equal(replayed.completedAt, 1793199982334);
 	intervals.length = 0;
 	const panel = mount(events[2].data.todos, replayed, 1793199982334);
 	panel.toggle();
-	assert.deepEqual(panel.items.map((entry) => entry.time), ['1m 59s', '1m 59s', '2m 07s', null]);
+	assert.deepEqual(panel.items.map((entry) => entry.time), ['1m 59s', '1m 59s', '2m 07s', '0s']);
 	assert.equal(panel.total, '总耗时 2m 07s');
 	assert.equal(panel.liveIntervals().length, 0);
 	panel.unmount();
 }
 console.log('ok  real session replay (P1/P2/P3 parallel + Q1 queued)');
+
+//#region always-on counts + numbered rows -------------------------------------
+{
+	intervals.length = 0;
+	const todos = [
+		{ content: '任务1', status: 'completed' },
+		{ content: '任务2', status: 'in_progress' },
+		{ content: '任务3', status: 'pending' }
+	];
+	const timer = timerOf([
+		item('任务1', 'completed', { startedAt: T, completedAt: T + 30_000 }),
+		item('任务2', 'in_progress', { startedAt: T }),
+		item('任务3', 'pending')
+	], { firstStartedAt: T });
+	const panel = mount(todos, timer, T + 45_000);
+	panel.toggle();
+	assert.deepEqual(panel.items.map((entry) => entry.ordinal), ['1', '2', '3'], 'rows are numbered');
+	assert.deepEqual(panel.items.map((entry) => entry.content), ['任务1', '任务2', '任务3']);
+	assert.ok(panel.text.includes('1 已完成 · 1 进行中 · 1 待处理'), 'all three counts are always shown');
+	assert.equal(panel.items[0].time, '30s');
+	assert.equal(panel.items[1].time, '45s');
+	assert.equal(panel.items[2].time, null, 'pending has no clock');
+	assert.equal(panel.total, '总耗时 45s');
+	panel.unmount();
+}
+console.log('ok  always-on counts + numbered rows');
+
+//#region turn/start: official todos empty, host projection keeps the list ------
+{
+	intervals.length = 0;
+	const todos = []; // the official `todos` projection is null at a turn boundary
+	const timer = timerOf([
+		item('完成 A', 'completed', { startedAt: T, completedAt: T + 60_000 }),
+		item('完成 B', 'completed', { startedAt: null, completedAt: T + 60_000 })
+	], { firstStartedAt: T, completedAt: T + 60_000 });
+	const panel = mount(todos, timer, T + 120_000);
+	panel.toggle();
+	assert.ok(panel.tree !== null, 'panel survives turn/start');
+	assert.equal(panel.items.length, 2);
+	assert.equal(panel.items[0].time, '1m 00s');
+	assert.equal(panel.items[1].time, '0s');
+	assert.equal(panel.total, '总耗时 1m 00s');
+	assert.equal(panel.liveIntervals().length, 0, 'all done: no ticker');
+	panel.unmount();
+}
+console.log('ok  turn/start keeps the panel from the host projection');
+
+//#region retained completed row + total from the host projection --------------
+{
+	intervals.length = 0;
+	const todos = [{ content: 'B', status: 'in_progress' }];
+	const timer = timerOf([
+		item('A', 'completed', { startedAt: T, completedAt: T + 60_000 }),
+		item('B', 'in_progress', { startedAt: T + 60_000 })
+	], { firstStartedAt: T });
+	const panel = mount(todos, timer, T + 90_000);
+	panel.toggle();
+	assert.deepEqual(panel.items.map((entry) => entry.content), ['A', 'B'], 'retained completed row is shown');
+	assert.deepEqual(panel.items.map((entry) => entry.ordinal), ['1', '2']);
+	assert.equal(panel.items[0].time, '1m 00s');
+	assert.equal(panel.items[1].time, '30s');
+	assert.ok(panel.text.includes('1 已完成 · 1 进行中 · 0 待处理'));
+	assert.equal(panel.total, '总耗时 1m 30s');
+	panel.unmount();
+}
+console.log('ok  retained completed row + host total');
+
+//#region all-done but never ran: total 0s -------------------------------------
+{
+	intervals.length = 0;
+	const todos = [{ content: '直接完成', status: 'completed' }];
+	const timer = timerOf([
+		item('直接完成', 'completed', { startedAt: null, completedAt: T })
+	], { firstStartedAt: null, completedAt: T });
+	const panel = mount(todos, timer, T + 5_000);
+	panel.toggle();
+	assert.equal(panel.items[0].time, '0s');
+	assert.equal(panel.total, '总耗时 0s', 'all-done list with no run reports 0s');
+	assert.equal(panel.liveIntervals().length, 0);
+	panel.unmount();
+}
+console.log('ok  all-done no-run total 0s');
+
+//#region all-pending: three counts, no total ----------------------------------
+{
+	intervals.length = 0;
+	const todos = [{ content: 'P', status: 'pending' }];
+	const timer = timerOf([item('P', 'pending')], { firstStartedAt: null });
+	const panel = mount(todos, timer, T + 5_000);
+	panel.toggle();
+	assert.ok(panel.text.includes('0 已完成 · 0 进行中 · 1 待处理'));
+	assert.equal(panel.total, null);
+	assert.equal(panel.items[0].time, null);
+	assert.equal(panel.liveIntervals().length, 0);
+	panel.unmount();
+}
+console.log('ok  all-pending counts, no total');
 
 console.log('ALL RENDER TESTS PASS');

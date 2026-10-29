@@ -66,6 +66,7 @@ window.__ModuleLoader__.load({
 			list: { flexDirection: "column", gap: 8, maxHeight: 180, margin: 0, padding: 0, listStyle: "none", display: "flex", overflowY: "auto" },
 			item: { minWidth: 0, color: "var(--dsw-alias-label-secondary)", alignItems: "center", gap: 10, fontSize: 13, lineHeight: "20px", display: "flex" },
 			glyph: { flex: "none", placeItems: "center", width: 16, height: 16, display: "grid" },
+			index: { flex: "none", color: "var(--dsw-alias-label-tertiary)", fontSize: 12, fontWeight: 400, lineHeight: "20px", fontVariantNumeric: "tabular-nums", minWidth: 18, textAlign: "right" },
 			content: { textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden" },
 			time: { marginLeft: "auto", flex: "none", color: "var(--dsw-alias-label-tertiary)", fontSize: 12, fontWeight: 400, lineHeight: "20px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", textAlign: "right" }
 		};
@@ -107,9 +108,9 @@ window.__ModuleLoader__.load({
 		* an `in_progress` item ticks from the moment it entered that state
 		* (`startedAt`), so several items running in parallel tick together on the
 		* same wall clock; a completed item freezes at the time it spent running
-		* (`startedAt` → `completedAt`). A pending (queued) item has no clock, and
-		* a completed item that was never observed running has no measured run
-		* time either — it shows nothing rather than billing its queue time.
+		* (`startedAt` → `completedAt`). A pending (queued) item has no clock; a
+		* completed item that was never observed running shows `0s` — its measured
+		* run time is zero, and its queue time is never billed as work.
 		*/
 		function itemDuration(item, timing, now) {
 			if (timing === null || timing === void 0) return null;
@@ -119,8 +120,10 @@ window.__ModuleLoader__.load({
 				return formatDuration(Math.max(0, now - from));
 			}
 			if (item.status === "completed") {
-				if (timing.completedAt === null || timing.completedAt === void 0) return null;
-				if (timing.startedAt === null || timing.startedAt === void 0) return null;
+				// A completed task that was never observed running spent no measured
+				// time: show 0s instead of hiding the clock or billing queue time.
+				if (timing.startedAt === null || timing.startedAt === void 0) return "0s";
+				if (timing.completedAt === null || timing.completedAt === void 0) return "0s";
 				return formatDuration(Math.max(0, timing.completedAt - timing.startedAt));
 			}
 			return null;
@@ -130,8 +133,8 @@ window.__ModuleLoader__.load({
 		* The list-level stopwatch: it starts when the first task entered the
 		* running state — `firstStartedAt` from the host projection when present,
 		* otherwise the earliest per-item `startedAt` (older host halves) — and
-		* freezes at the last completion once every task is done. `null` while no
-		* task has ever run (an all-pending queue has no total to show).
+		* freezes at the last completion once every task is done. An all-done list
+		* whose tasks never ran reports 0s; an all-pending queue has no total yet.
 		*/
 		function totalSpan(timer, items, allDone, now) {
 			if (timer === null || timer === void 0) return null;
@@ -143,7 +146,11 @@ window.__ModuleLoader__.load({
 					if (start === null || item.startedAt < start) start = item.startedAt;
 				}
 			}
-			if (start === null) return null;
+			if (start === null) {
+				// No task ever ran. A fully completed list spent 0 measured time; a
+				// list that still has pending work has no total yet.
+				return allDone ? { start: now, end: now } : null;
+			}
 			if (!allDone) return { start, end: now };
 			let end = null;
 			for (const item of items) {
@@ -158,29 +165,32 @@ window.__ModuleLoader__.load({
 			const lang = STRINGS[uiLang()];
 			const [collapsed, setCollapsed] = react.useState(true);
 			const [now, setNow] = react.useState(() => Date.now());
-			const items = timer !== null && timer !== void 0 && timer.items !== void 0 ? timer.items : NO_ITEMS;
+			// The host projection is authoritative for the current list: it keeps
+			// completed rows that a later write of the same list omits, and it still
+			// has them when the official `todos` projection resets to null at a turn
+			// boundary. Fall back to the official list when the host half is missing.
+			const timerItems = timer !== null && timer !== void 0 && Array.isArray(timer.items) ? timer.items : NO_ITEMS;
+			const items = timerItems.length > 0 ? timerItems : todos;
 			// One pass per projection update instead of one Map per one-second tick.
-			const timingOf = react.useMemo(() => new Map(items.map((item) => [item.content, item])), [items]);
-			const done = todos.filter((item) => item.status === "completed").length;
-			const active = todos.filter((item) => item.status === "in_progress").length;
-			const pending = todos.length - done - active;
-			const allDone = todos.length > 0 && done === todos.length;
+			const timingOf = react.useMemo(() => new Map(timerItems.map((item) => [item.content, item])), [timerItems]);
+			const done = items.filter((item) => item.status === "completed").length;
+			const active = items.filter((item) => item.status === "in_progress").length;
+			const pending = items.length - done - active;
+			const allDone = items.length > 0 && done === items.length;
 			const span = totalSpan(timer, items, allDone, now);
 			// The header total is visible while collapsed, so it must keep ticking
 			// even then; item clocks only exist while something is running.
-			const ticking = todos.length > 0 && span !== null && !allDone;
+			const ticking = items.length > 0 && span !== null && !allDone;
 			react.useEffect(() => {
 				if (!ticking) return;
 				setNow(Date.now());
 				const t = setInterval(() => setNow(Date.now()), 1000);
 				return () => clearInterval(t);
 			}, [ticking]);
-			if (todos.length === 0) return null;
-			const header = [
-				...done > 0 ? [lang.done(done)] : [],
-				...active > 0 ? [lang.active(active)] : [],
-				...pending > 0 ? [lang.pending(pending)] : []
-			].join(" · ");
+			if (items.length === 0) return null;
+			// All three counts are always shown (including zero), matching the
+			// requested header: "任务 X 已完成 X 进行中 X 待处理 总耗时 XXX".
+			const header = [lang.done(done), lang.active(active), lang.pending(pending)].join(" · ");
 			const total = span === null ? null : lang.total(formatDuration(Math.max(0, span.end - span.start)));
 			return jsx.jsx("section", {
 				style: S.root,
@@ -202,13 +212,14 @@ window.__ModuleLoader__.load({
 						]
 					}), !collapsed && jsx.jsx("ul", {
 						style: S.list,
-						children: todos.map((item) => {
+						children: items.map((item, index) => {
 							const duration = itemDuration(item, timingOf.get(item.content) ?? null, now);
 							return jsx.jsxs("li", {
 								style: S.item,
 								"data-status": item.status,
 								children: [
 									jsx.jsx("span", { style: S.glyph, role: "img", "aria-label": lang.status[item.status] ?? item.status, children: jsx.jsx(StateDot, { state: statusDotState(item.status) }) }),
+									jsx.jsx("span", { style: S.index, "aria-hidden": true, children: `${index + 1}.` }),
 									jsx.jsx("span", { style: S.content, children: item.content }),
 									duration === null ? null : jsx.jsx("span", { style: S.time, "data-testid": "todo-timer-item-time", children: duration })
 								]

@@ -47,13 +47,15 @@ else {
 		if (item.status === 'in_progress') {
 			const from = item.startedAt ?? item.seenAt;
 			if (from !== null) dur = fmt(now - from);
-		} else if (item.status === 'completed' && item.startedAt !== null && item.completedAt !== null) {
-			dur = fmt(item.completedAt - item.startedAt);
+		} else if (item.status === 'completed') {
+			dur = item.startedAt !== null && item.completedAt !== null ? fmt(item.completedAt - item.startedAt) : '0s';
 		}
 		console.log(`[${item.status.padEnd(11)}] ${dur.padStart(10)}  ${item.content}`);
 	}
 	if (state.firstStartedAt !== null) {
 		const end = state.completedAt !== null ? state.completedAt : now;
 		console.log('TOTAL:', fmt(end - state.firstStartedAt));
+	} else if (state.items.length > 0 && state.items.every((item) => item.status === 'completed')) {
+		console.log('TOTAL: 0s');
 	}
 }

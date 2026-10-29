@@ -8,6 +8,10 @@
  * projection, so the shipped panel and this one read the same event log
  * independently and official updates cannot collide with it.
  *
+ * 0.3.0 keeps the current list's completed rows: an item that disappears from a
+ * later write of the SAME list keeps its frozen timing and stays in `items`.
+ * A zero-overlap write is a new list and drops the previous rows.
+ *
  * @module dsh-todo-timer
  */
 const name = "todo-timer";
@@ -27,17 +31,25 @@ const inject = ["sessionProjections"];
  * `createdAt` (earliest listing time) and `completedAt` (first all-completed
  * observation) are kept for older readers and for diagnostics.
  *
+ * Completed rows are permanent within the current list: when a continuing write
+ * omits a completed item, its record is retained at its old position. Only a
+ * zero-overlap (new list) or empty write drops the previous rows. A completed
+ * item may pass its timeline to a same-index replacement only when that
+ * replacement is also completed (a text edit) or open (a reopen under a new
+ * name); a fresh queued item never inherits a finished task's duration.
+ *
  * Timing survives turn boundaries: the stamps replay from the whole event log,
- * so a session reload restores every frozen duration.
+ * so a session reload restores every frozen duration. `turn/start` re-arms the
+ * per-turn clocks but does not clear the current list.
  * @param state - previous timing state (null before the first write).
  * @param event - the committed session event (`time` is its wall-clock ms).
  * @returns the next timing state.
  */
 function foldTodoTimer(state, event) {
 	if (event.type === "turn/start") {
-		// A turn boundary re-arms the per-turn clocks: the turn's opening write
-		// created its items after the turn began, and anything first reported
-		// completed in this turn's writes took at least since the turn began.
+		// A turn boundary re-arms the per-turn clocks. It must not drop the
+		// current list: the panel keeps rendering its rows while the next write
+		// is pending, so completed durations never blink out at a turn edge.
 		if (state === null) return state;
 		return {
 			...state,
@@ -54,17 +66,26 @@ function foldTodoTimer(state, event) {
 	// A zero-overlap write is a brand-new list, where positional matching
 	// would graft unrelated old timelines onto fresh items.
 	const overlap = event.data.todos.reduce((count, item) => count + (byContent.has(item.content) ? 1 : 0), 0);
+	const continuation = overlap > 0;
+	const consumed = new Set();
+	let sawNewCompletion = false;
 	const items = event.data.todos.map((incoming, index) => {
 		let old = byContent.get(incoming.content);
-		if (old === void 0 && overlap > 0) {
+		if (old === void 0 && continuation) {
 			// Rename inheritance: the model edits item text between writes, which
 			// breaks content matching. A vanished non-completed item (still running
-			// or still queued) may pass its timeline to the fresh text at its index
-			// — its work is open, so the listing time stays honest. A completed
-			// item is a closed book: grafting its duration onto an unrelated new
-			// task would fabricate time.
+			// or still queued) may pass its timeline to the fresh text at its index.
+			// A completed item may pass its timeline only to a completed or open
+			// replacement (a text edit or a reopen under a new name); replacing a
+			// finished task with a fresh queued one must not graft its duration.
 			const positional = prevItems[index];
-			if (positional !== void 0 && positional.status !== "completed" && !incomingContents.has(positional.content)) old = positional;
+			if (positional !== void 0 && !incomingContents.has(positional.content)) {
+				const allow = positional.status !== "completed" || incoming.status !== "pending";
+				if (allow) {
+					old = positional;
+					consumed.add(positional.content);
+				}
+			}
 		}
 		// A brand-new item with no inherited timeline: one first listed as open
 		// (pending/in_progress) starts at this write; one first reported already
@@ -79,6 +100,10 @@ function foldTodoTimer(state, event) {
 			startedAt = old !== void 0 && old.status === "in_progress" && old.startedAt !== null ? old.startedAt : now;
 		} else if (incoming.status === "completed") {
 			completedAt = old !== void 0 && old.completedAt !== null ? old.completedAt : now;
+			// A completion first observed in this write (a new item, or an open
+			// item that just finished) must move the list-level completion stamp
+			// forward even when the previous list was already all-complete.
+			if (old === void 0 || old.completedAt === null) sawNewCompletion = true;
 			startedAt = old !== void 0 && old.startedAt !== null ? old.startedAt : null;
 		}
 		return {
@@ -89,10 +114,22 @@ function foldTodoTimer(state, event) {
 			completedAt
 		};
 	});
+	// Completed rows of a continuing list are permanent: keep each one the new
+	// snapshot omitted, at (approximately) its old position. Queued or running
+	// rows that vanished are dropped — only finished work is retained.
+	if (continuation) {
+		for (let index = 0; index < prevItems.length; index++) {
+			const old = prevItems[index];
+			if (old.status !== "completed") continue;
+			if (incomingContents.has(old.content)) continue;
+			if (consumed.has(old.content)) continue;
+			items.splice(Math.min(index, items.length), 0, old);
+		}
+	}
 	// The list-level stopwatch origin: keep the previous origin while the list
 	// continues, otherwise take the earliest run start this new list has seen.
 	let firstStartedAt = null;
-	if (overlap > 0 && state !== null && state.firstStartedAt !== null && state.firstStartedAt !== void 0) firstStartedAt = state.firstStartedAt;
+	if (continuation && state !== null && state.firstStartedAt !== null && state.firstStartedAt !== void 0) firstStartedAt = state.firstStartedAt;
 	if (firstStartedAt === null) {
 		for (const item of items) {
 			if (item.startedAt === null || item.startedAt === void 0) continue;
@@ -103,7 +140,10 @@ function foldTodoTimer(state, event) {
 	const allDone = items.length > 0 && items.every((item) => item.status === "completed");
 	const prevAllDone = state !== null && state.items.length > 0 && state.items.every((item) => item.status === "completed");
 	let completedAt = null;
-	if (allDone) completedAt = state !== null && prevAllDone && state.completedAt !== null ? state.completedAt : now;
+	// Keep the previous stamp only while the SAME list stays all-complete and no
+	// item completed in this write. A brand-new list, or a newly completed item,
+	// starts a new list completion stamp.
+	if (allDone) completedAt = !sawNewCompletion && continuation && prevAllDone && state !== null && state.completedAt !== null ? state.completedAt : now;
 	return {
 		items,
 		createdAt,
@@ -130,7 +170,7 @@ function apply(ctx) {
 			viewSchema: passThrough,
 			view: (state) => state
 		},
-		stateVersion: 7
+		stateVersion: 8
 	});
 }
 

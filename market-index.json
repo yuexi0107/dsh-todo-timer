@@ -19,8 +19,8 @@
       "name": "dsh-todo-timer",
       "title": { "en": "To-do Timer", "zh": "任务计时" },
       "description": {
-        "en": "Live per-task timing for the to-do panel: only in-progress tasks tick (parallel runners tick together), queued tasks show no clock, completed tasks freeze their measured run time, and the header shows the running total from the first task's start. A pure plugin — no patched install files.",
-        "zh": "给任务面板加每项计时与顶部总耗时：只有运行中的任务实时跳动（并行任务一起跳），排队任务不计时，已完成定格实际运行时长；顶部总耗时从第一个任务开始运行起计时。纯插件，不修改任何安装文件。"
+        "en": "Live per-task timing for the to-do panel: always-on status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a total from the first task start until the current list ends. A pure plugin — no patched install files.",
+        "zh": "给任务面板加上状态计数、序号、每项耗时与总耗时：三个计数始终显示（含 0），任务行带连续序号；完成项耗时冻结，从未实际运行的完成项显示 0s；总耗时从当前清单第一个任务开始到全部结束。纯插件，不修改任何安装文件。"
       },
       "author": "yujun.cheng",
       "homepage": "https://github.com/GITHUB_OWNER/dsh-todo-timer",
@@ -30,10 +30,21 @@
       "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4KICA8cmVjdCB4PSI2IiB5PSI4IiB3aWR0aD0iMzYiIGhlaWdodD0iOCIgcng9IjQiIGZpbGw9IiMwMEIwNTAiLz4KICA8cmVjdCB4PSI2IiB5PSIyNCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjgiIHJ4PSI0IiBmaWxsPSIjOGE4Zjk4Ii8+CiAgPHJlY3QgeD0iNiIgeT0iNDAiIHdpZHRoPSIyMCIgaGVpZ2h0PSI4IiByeD0iNCIgZmlsbD0iI2MzYzdjZCIvPgogIDxjaXJjbGUgY3g9IjQ3IiBjeT0iNDEiIHI9IjE1IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMEIwNTAiIHN0cm9rZS13aWR0aD0iNCIvPgogIDxwYXRoIGQ9Ik00NyAzMnY5bDYgNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDBCMDUwIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K",
       "metadata": {
         "category": "ui",
-        "keywords": ["todo", "timer", "duration", "任务", "计时", "面板"],
+        "keywords": ["todo", "timer", "duration", "status", "任务", "计时", "面板"],
         "labels": ["todo", "timing"]
       },
       "versions": [
+        {
+          "version": "0.3.0",
+          "publishTimestamp": 1793204276,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/GITHUB_OWNER/dsh-todo-timer",
+            "commit": "0000000000000000000000000000000000000000",
+            "path": "dsh-todo-timer"
+          },
+          "engines": { "dsh": ">=0.2.0-rc" }
+        },
         {
           "version": "0.2.0",
           "publishTimestamp": 1793201525,
