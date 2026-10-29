@@ -99,11 +99,15 @@ Write-Host "代码已推送。commit: $sha"
 
 # 6. 只把 0.3.0 的 40 个 0 哨兵替换为代码提交 SHA（不碰 0.2.0/0.1.3 的历史 commit）
 $idxText = Get-Content $marketPath -Raw -Encoding UTF8
-$idxText = $idxText -replace '"commit":\s*"0{40}"', "`"commit`": `"$sha`""
-[IO.File]::WriteAllText($marketPath, $idxText, [Text.UTF8Encoding]::new($false))
-Invoke-Git @("add", "market-index.json")
-Invoke-Git @("-c", "user.name=$Owner", "-c", "user.email=$Owner@users.noreply.github.com", "commit", "-m", "chore: pin market index 0.3.0 to $sha")
-Invoke-Git @("push")
+if ($idxText -match '"commit":\s*"0{40}"') {
+  $idxText = $idxText -replace '"commit":\s*"0{40}"', "`"commit`": `"$sha`""
+  [IO.File]::WriteAllText($marketPath, $idxText, [Text.UTF8Encoding]::new($false))
+  Invoke-Git @("add", "market-index.json")
+  Invoke-Git @("-c", "user.name=$Owner", "-c", "user.email=$Owner@users.noreply.github.com", "commit", "-m", "chore: pin market index 0.3.0 to $sha")
+  Invoke-Git @("push")
+} else {
+  Write-Host "market-index 0.3.0 已经 pin 过，跳过 pin 提交"
+}
 $sha2 = (& git rev-parse HEAD).Trim()
 
 Write-Host ""
