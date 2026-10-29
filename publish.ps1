@@ -7,7 +7,7 @@ param(
   [string]$Branch = "main",
   [switch]$DryRun
 )
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 Set-Location $PSScriptRoot
 
 $repoUrl  = "https://github.com/$Owner/$Repo"
@@ -21,7 +21,7 @@ $validatePath = Join-Path $PSScriptRoot "validate-index.mjs"
 
 function Invoke-Git {
   param([string[]]$GitArgs)
-  & git @GitArgs
+  & git @GitArgs 2>&1 | ForEach-Object { Write-Host $_ }
   if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') 失败（exit $LASTEXITCODE）" }
 }
 
@@ -85,11 +85,14 @@ foreach ($f in @($marketPath, $packagePath, $readmePath, $awesomePath, $validate
 Invoke-Git @("add", "-A")
 Invoke-Git @("-c", "user.name=$Owner", "-c", "user.email=$Owner@users.noreply.github.com", "commit", "-m", "release: v$($pkg.version) — status counts, numbered rows, frozen completed durations", "--allow-empty")
 Invoke-Git @("branch", "-M", $Branch)
-$origin = & git remote get-url origin 2>$null
-if ($LASTEXITCODE -ne 0 -or -not $origin) {
+$remotes = & git remote
+if ($LASTEXITCODE -ne 0) { throw "git remote 失败（exit $LASTEXITCODE）" }
+if ($remotes -contains "origin") {
+  $origin = (& git remote get-url origin).Trim()
+  if ($LASTEXITCODE -ne 0) { throw "git remote get-url origin 失败（exit $LASTEXITCODE）" }
+  if ($origin -ne $repoUrl) { Invoke-Git @("remote", "set-url", "origin", $repoUrl) }
+} else {
   Invoke-Git @("remote", "add", "origin", $repoUrl)
-} elseif ($origin.Trim() -ne $repoUrl) {
-  Invoke-Git @("remote", "set-url", "origin", $repoUrl)
 }
 Invoke-Git @("push", "-u", "origin", $Branch)
 Invoke-Git @("tag", "-f", "v$($pkg.version)")
