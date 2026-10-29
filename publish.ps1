@@ -21,7 +21,7 @@ $validatePath = Join-Path $PSScriptRoot "validate-index.mjs"
 
 function Invoke-Git {
   param([string[]]$GitArgs)
-  & git @GitArgs 2>&1 | ForEach-Object { Write-Host $_ }
+  & git -c credential.helper= @GitArgs 2>&1 | ForEach-Object { Write-Host $_ }
   if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') 失败（exit $LASTEXITCODE）" }
 }
 
@@ -61,7 +61,7 @@ Write-Host "版本检查通过: $($pkg.version)"
 
 # 2. 仓库可达性（空仓库也可通过；不存在的仓库会失败）
 Write-Host "检查 GitHub 仓库: $repoUrl"
-& git ls-remote $repoUrl | Out-Null
+& git -c credential.helper= ls-remote $repoUrl | Out-Null
 if ($LASTEXITCODE -ne 0) {
   throw "无法访问 $repoUrl。请先在 GitHub 创建 public 空仓库（不要初始化 README/license），并确认本机 git 凭据可用。"
 }
