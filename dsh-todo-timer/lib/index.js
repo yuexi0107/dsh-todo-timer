@@ -51,10 +51,13 @@ const inject = ["sessionProjections"];
  */
 function foldTodoTimer(state, event) {
 	if (event.type === "turn/start") {
-		// A turn boundary re-arms the per-turn clocks. It must not drop the
-		// current list or its history: the panel keeps rendering every completed
-		// row while the next write is pending.
+		// A new round begins. If every displayed task is already completed, hide
+		// the panel like the shipped todo panel (whose `todos` projection resets
+		// to null at a turn boundary). While work remains, keep the current list
+		// and its completed history so timings are not lost across the boundary.
 		if (state === null) return state;
+		const allDone = state.items.length > 0 && state.items.every((item) => item.status === "completed");
+		if (allDone) return null;
 		return {
 			...state,
 			turnStartedAt: event.time,

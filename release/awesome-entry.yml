@@ -2,6 +2,6 @@ url: https://github.com/yuexi0107/dsh-todo-timer
 name: yuexi0107/dsh-todo-timer
 category: ui
 description:
-  en: Live per-task timing for the DSH to-do panel with status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a conversation-wide total. Completed rows persist for the whole conversation; a new conversation starts fresh.
-  zh: 给 DSH 任务面板加上状态计数、序号、每项耗时与总耗时；完成项耗时冻结，从未实际运行的完成项显示 0s；同一对话内完成项永久保留（跨清单/清空不消失），总耗时从会话第一个任务开始到全部结束；新开对话面板消失。
+  en: Live per-task timing for the DSH to-do panel with status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a conversation-wide total. Completed rows persist while the task is active; when everything is done and a new round begins, the panel clears like the shipped one.
+  zh: 给 DSH 任务面板加上状态计数、序号、每项耗时与总耗时；完成项耗时冻结，从未实际运行的完成项显示 0s；当前任务进行中到完成期间完成项永久保留，全部完成后进入新一轮对话时面板清空/消失，像原功能；新开对话面板消失。
 icon: https://raw.githubusercontent.com/yuexi0107/dsh-todo-timer/main/assets/icon-180.png

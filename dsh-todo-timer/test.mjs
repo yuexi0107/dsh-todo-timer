@@ -100,6 +100,11 @@ assert.equal(s.items[4].completedAt, T6);
 assert.equal(s.completedAt, T6, 'total moves forward for a new completion');
 assert.equal(s.firstStartedAt, T0);
 
+// 7b. All tasks done + a new round begins: the panel clears, like the shipped
+// todo panel (whose `todos` projection resets to null at turn/start).
+const clearedOnNewRound = foldTodoTimer(s, { type: 'turn/start', time: T6 + 1_000, data: {} });
+assert.equal(clearedOnNewRound, null, 'all-done turn/start clears the panel');
+
 // 8. T7: reopen archived A under a new list -> A becomes current again, clock restarts.
 const T7 = T6 + 10_000;
 s = foldTodoTimer(s, ev([{ content: 'A', status: 'in_progress' }], T7));

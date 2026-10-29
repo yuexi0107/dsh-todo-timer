@@ -19,8 +19,8 @@
       "name": "dsh-todo-timer",
       "title": { "en": "To-do Timer", "zh": "任务计时" },
       "description": {
-        "en": "Live per-task timing for the to-do panel: always-on status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a conversation-wide total. Completed rows persist for the whole conversation; a new conversation starts fresh. A pure plugin — no patched install files.",
-        "zh": "给任务面板加上状态计数、序号、每项耗时与总耗时：三个计数始终显示（含 0），任务行带连续序号；完成项耗时冻结，从未实际运行的完成项显示 0s；同一对话内完成项永久保留（跨清单/清空不消失），总耗时从会话第一个任务开始到全部结束；新开对话面板消失。纯插件，不修改任何安装文件。"
+        "en": "Live per-task timing for the to-do panel: always-on status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a conversation-wide total. Completed rows persist while the task is active; when everything is done and a new round begins, the panel clears like the shipped one. A pure plugin — no patched install files.",
+        "zh": "给任务面板加上状态计数、序号、每项耗时与总耗时：三个计数始终显示（含 0），任务行带连续序号；完成项耗时冻结，从未实际运行的完成项显示 0s；当前任务进行中到完成期间完成项永久保留，全部完成后进入新一轮对话时面板清空/消失，像原功能；新开对话面板消失。纯插件，不修改任何安装文件。"
       },
       "author": "yujun.cheng",
       "homepage": "https://github.com/yuexi0107/dsh-todo-timer",
