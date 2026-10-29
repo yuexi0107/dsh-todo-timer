@@ -1,0 +1,4 @@
+# local development / verification artifacts (never shipped)
+verify/
+node_modules/
+*.log
