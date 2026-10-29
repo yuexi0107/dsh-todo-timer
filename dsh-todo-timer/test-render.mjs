@@ -495,4 +495,43 @@ console.log('ok  all-done no-run total 0s');
 }
 console.log('ok  all-pending counts, no total');
 
+//#region new list keeps conversation-wide completed history -------------------
+{
+	intervals.length = 0;
+	const todos = [{ content: '新任务', status: 'in_progress' }];
+	const timer = timerOf([
+		item('旧完成', 'completed', { startedAt: T, completedAt: T + 60_000, order: 0, archived: true }),
+		item('新任务', 'in_progress', { startedAt: T + 120_000, order: 1 })
+	], { firstStartedAt: T });
+	const panel = mount(todos, timer, T + 150_000);
+	panel.toggle();
+	assert.deepEqual(panel.items.map((entry) => entry.content), ['旧完成', '新任务'], 'history row survives a new list');
+	assert.deepEqual(panel.items.map((entry) => entry.ordinal), ['1', '2']);
+	assert.equal(panel.items[0].time, '1m 00s');
+	assert.equal(panel.items[1].time, '30s');
+	assert.ok(panel.text.includes('1 已完成 · 1 进行中 · 0 待处理'));
+	assert.equal(panel.total, '总耗时 2m 30s', 'conversation total does not reset on a new list');
+	panel.unmount();
+}
+console.log('ok  new list keeps completed history + total');
+
+//#region cleared list still shows completed history ---------------------------
+{
+	intervals.length = 0;
+	const todos = [];
+	const timer = timerOf([
+		item('旧完成', 'completed', { startedAt: T, completedAt: T + 60_000, order: 0, archived: true })
+	], { firstStartedAt: T, completedAt: T + 60_000 });
+	const panel = mount(todos, timer, T + 120_000);
+	panel.toggle();
+	assert.ok(panel.tree !== null, 'cleared list still shows completed history');
+	assert.deepEqual(panel.items.map((entry) => entry.content), ['旧完成']);
+	assert.equal(panel.items[0].time, '1m 00s');
+	assert.ok(panel.text.includes('1 已完成 · 0 进行中 · 0 待处理'));
+	assert.equal(panel.total, '总耗时 1m 00s');
+	assert.equal(panel.liveIntervals().length, 0);
+	panel.unmount();
+}
+console.log('ok  cleared list keeps completed history');
+
 console.log('ALL RENDER TESTS PASS');

@@ -1,7 +1,7 @@
 {
   "name": "dsh-todo-timer",
-  "version": "0.3.0",
-  "description": "Live per-task timing for the DSH to-do panel: always-on status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a total from the first task start until the current list ends. A pure plugin — no patched install files.",
+  "version": "0.3.1",
+  "description": "Live per-task timing for the DSH to-do panel: always-on status counts, numbered rows, frozen completed durations, 0s for tasks that never ran, and a conversation-wide total. Completed rows persist for the whole conversation; a new conversation starts fresh. A pure plugin — no patched install files.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
